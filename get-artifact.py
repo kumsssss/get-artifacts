@@ -14,6 +14,8 @@ APP_NAME = 'appName'
 APP_TYPE = 'applicationType'
 PRODUCTS = 'products'
 VERTICALS = 'verticals'
+HYBRID = 'hybrid'
+K8S = 'k8s'
 
 
 def read_arguments(argv):
@@ -124,7 +126,7 @@ def get_matching_artifacts(filename, **kwargs):
                 output.append(match)
 
     output.sort(key=functools.cmp_to_key(comparator))
-    print_output_table(output)
+    generate_and_print_output_tables(output)
 
     dictionary = {
         "artifacts" : output
@@ -157,35 +159,54 @@ def comparator(a, b):
     return comparator_by_key(a, b, DEPLOYMENT_TARGET)
 
 
-def print_output_table(output):
+def generate_and_print_output_tables(output):
     headers = [DEPLOYMENT_TARGET, ARTIFACT_ID, ARTIFACT_TYPE, APP_NAME, APP_TYPE]
-    t = PrettyTable(headers)
-    current_deployment_target = ''
-
+    hybrid_table = PrettyTable(headers)
+    k8s_table = PrettyTable(headers)
+    vms_table = PrettyTable(headers)
+    configs_table = PrettyTable(headers)
+    db_table = PrettyTable(headers)
+    others_table = PrettyTable(headers)
 
     for x in output:
-        if DEPLOYMENT_TARGET in x and current_deployment_target == '':
-            current_deployment_target = x[DEPLOYMENT_TARGET]
-        elif DEPLOYMENT_TARGET in x and current_deployment_target != x[DEPLOYMENT_TARGET]:
-            print(current_deployment_target)
-            print(t)
-            t = PrettyTable(headers)
-            current_deployment_target = x[DEPLOYMENT_TARGET]
-        elif DEPLOYMENT_TARGET not in x and current_deployment_target != '':
-            print(current_deployment_target)
-            print(t)
-            t = PrettyTable(headers)
-            current_deployment_target = ''
-
-        if DEPLOYMENT_TARGET in x and ARTIFACT_TYPE in x:
-            t.add_row([x[DEPLOYMENT_TARGET], x[ARTIFACT_ID], x[ARTIFACT_TYPE], '', ''])
-        elif DEPLOYMENT_TARGET in x and APP_TYPE in x:
-            t.add_row([x[DEPLOYMENT_TARGET], '', '', x[APP_NAME], x[APP_TYPE]])
-        elif ARTIFACT_TYPE in x:
-            t.add_row(['', x[ARTIFACT_ID], x[ARTIFACT_TYPE], '', ''])
+        if DEPLOYMENT_TARGET in x and x[DEPLOYMENT_TARGET] == HYBRID:
+            add_row_to_table(x, hybrid_table)
+        elif DEPLOYMENT_TARGET in x and x[DEPLOYMENT_TARGET] == K8S:
+            add_row_to_table(x, k8s_table)
+        elif DEPLOYMENT_TARGET not in x and ARTIFACT_TYPE in x and x[ARTIFACT_TYPE] == 'configs.zip':
+            add_row_to_table(x, configs_table)
+        elif DEPLOYMENT_TARGET not in x and ARTIFACT_TYPE in x and x[ARTIFACT_TYPE] == 'sql.zip':
+            add_row_to_table(x, db_table)
+        elif DEPLOYMENT_TARGET not in x:
+            add_row_to_table(x, vms_table)
         else:
-            t.add_row(['', '', '', x[APP_NAME], x[APP_TYPE]])
-    print(t)
+            add_row_to_table(x, others_table)
+
+    print("k8s")
+    print(k8s_table)
+    print("hybrid")
+    print(hybrid_table)
+    print("VMs")
+    print(vms_table)
+    print("Configs")
+    print(configs_table)
+    print("Database")
+    print(db_table)
+    print("Others")
+    print(others_table)
+
+
+def add_row_to_table(x, table):
+    if DEPLOYMENT_TARGET in x and ARTIFACT_TYPE in x:
+        table.add_row([x[DEPLOYMENT_TARGET], x[ARTIFACT_ID], x[ARTIFACT_TYPE], '', ''])
+    elif DEPLOYMENT_TARGET in x and APP_TYPE in x:
+        table.add_row([x[DEPLOYMENT_TARGET], '', '', x[APP_NAME], x[APP_TYPE]])
+    elif ARTIFACT_TYPE in x and x[ARTIFACT_TYPE] != 'sql.zip' and x[ARTIFACT_TYPE] != 'configs.zip':
+        table.add_row(['VMs', x[ARTIFACT_ID], x[ARTIFACT_TYPE], '', ''])
+    elif ARTIFACT_TYPE in x:
+        table.add_row(['', x[ARTIFACT_ID], x[ARTIFACT_TYPE], '', ''])
+    else:
+        table.add_row(['', '', '', x[APP_NAME], x[APP_TYPE]])
 
 
 def main(argv):
