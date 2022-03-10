@@ -1,3 +1,5 @@
 gitdb==4.0.9
 GitPython==3.1.27
+prettytable==3.2.0
 smmap==5.0.0
+wcwidth==0.2.5

@@ -2,6 +2,7 @@ import json
 
 unique_products = []
 unique_verticals = []
+unique_deployment_targets = []
 with open('deployment_manifest.json', 'r') as f:
     arr = json.load(f)
     for component in arr['artifacts']:
@@ -15,9 +16,12 @@ with open('deployment_manifest.json', 'r') as f:
             for vert in curr_verticals:
                 if vert not in unique_verticals:
                     unique_verticals.append(vert)
+        if 'deploymentTarget' in component and component['deploymentTarget'] not in unique_deployment_targets:
+            unique_deployment_targets.append(component['deploymentTarget'])
 
 unique_products.sort()
 unique_verticals.sort()
+print(unique_deployment_targets)
 
 with open('products_master.out', "w") as f:
     f.writelines('\n'.join(unique_products))
