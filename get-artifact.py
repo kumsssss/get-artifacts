@@ -14,6 +14,9 @@ APP_NAME = 'appName'
 APP_TYPE = 'applicationType'
 PRODUCTS = 'products'
 VERTICALS = 'verticals'
+HYBRID = 'hybrid'
+K8S = 'k8s'
+DB_TYPE = 'dbType'
 
 
 def read_arguments(argv):
@@ -118,13 +121,16 @@ def get_matching_artifacts(filename, **kwargs):
                 if ARTIFACT_ID in component and ARTIFACT_TYPE in component:
                     match[ARTIFACT_ID] = component[ARTIFACT_ID]
                     match[ARTIFACT_TYPE] = component[ARTIFACT_TYPE]
+                    if component[ARTIFACT_TYPE] == "sql.zip" and DB_TYPE in component:
+                        match[DB_TYPE] = component[DB_TYPE]
                 elif APP_NAME in component and APP_TYPE in component:
                     match[APP_NAME] = component[APP_NAME]
                     match[APP_TYPE] = component[APP_TYPE]
+                
                 output.append(match)
 
     output.sort(key=functools.cmp_to_key(comparator))
-    print_output_table(output)
+    generate_and_print_output_tables(output)
 
     dictionary = {
         "artifacts" : output
@@ -151,41 +157,77 @@ def comparator(a, b):
             return comparator_by_key(a, b, ARTIFACT_TYPE)
         elif attr == ARTIFACT_TYPE:
             return comparator_by_key(a, b, APP_TYPE)
+        elif attr == APP_TYPE:
+            return comparator_by_key(a, b, DB_TYPE)
         else:
             return 0
 
     return comparator_by_key(a, b, DEPLOYMENT_TARGET)
 
 
-def print_output_table(output):
-    headers = [DEPLOYMENT_TARGET, ARTIFACT_ID, ARTIFACT_TYPE, APP_NAME, APP_TYPE]
-    t = PrettyTable(headers)
-    current_deployment_target = ''
+def generate_and_print_output_tables(output):
+    '''
+    Creates the tables to output with the respective headers.
+    Checks the content of the component to determine which table to add to.
+    Calls function add_row_to_table to add component to table
+    '''
+    headers = [DEPLOYMENT_TARGET, ARTIFACT_ID + " / " +  APP_NAME, ARTIFACT_TYPE + " / " + APP_TYPE]
+    db_table_headers = [DEPLOYMENT_TARGET, ARTIFACT_ID + " / " +  APP_NAME, ARTIFACT_TYPE + " / " + APP_TYPE, DB_TYPE]
+    hybrid_table = PrettyTable(headers)
+    k8s_table = PrettyTable(headers)
+    vms_table = PrettyTable(headers)
+    configs_table = PrettyTable(headers)
+    others_table = PrettyTable(headers)
+    db_table = PrettyTable(db_table_headers)
 
 
     for x in output:
-        if DEPLOYMENT_TARGET in x and current_deployment_target == '':
-            current_deployment_target = x[DEPLOYMENT_TARGET]
-        elif DEPLOYMENT_TARGET in x and current_deployment_target != x[DEPLOYMENT_TARGET]:
-            print(current_deployment_target)
-            print(t)
-            t = PrettyTable(headers)
-            current_deployment_target = x[DEPLOYMENT_TARGET]
-        elif DEPLOYMENT_TARGET not in x and current_deployment_target != '':
-            print(current_deployment_target)
-            print(t)
-            t = PrettyTable(headers)
-            current_deployment_target = ''
-
-        if DEPLOYMENT_TARGET in x and ARTIFACT_TYPE in x:
-            t.add_row([x[DEPLOYMENT_TARGET], x[ARTIFACT_ID], x[ARTIFACT_TYPE], '', ''])
-        elif DEPLOYMENT_TARGET in x and APP_TYPE in x:
-            t.add_row([x[DEPLOYMENT_TARGET], '', '', x[APP_NAME], x[APP_TYPE]])
-        elif ARTIFACT_TYPE in x:
-            t.add_row(['', x[ARTIFACT_ID], x[ARTIFACT_TYPE], '', ''])
+        if DEPLOYMENT_TARGET in x and x[DEPLOYMENT_TARGET] == HYBRID:
+            add_row_to_table(x, hybrid_table)
+        elif DEPLOYMENT_TARGET in x and x[DEPLOYMENT_TARGET] == K8S:
+            add_row_to_table(x, k8s_table)
+        elif DEPLOYMENT_TARGET not in x and ARTIFACT_TYPE in x and x[ARTIFACT_TYPE] == 'configs.zip':
+            add_row_to_table(x, configs_table)
+        elif DEPLOYMENT_TARGET not in x and ARTIFACT_TYPE in x and x[ARTIFACT_TYPE] == 'sql.zip':
+            add_row_to_table(x, db_table)
+        elif DEPLOYMENT_TARGET not in x:
+            add_row_to_table(x, vms_table)
         else:
-            t.add_row(['', '', '', x[APP_NAME], x[APP_TYPE]])
-    print(t)
+            add_row_to_table(x, others_table)
+
+    print("k8s")
+    print(k8s_table)
+    print("hybrid")
+    print(hybrid_table)
+    print("VMs")
+    print(vms_table)
+    print("Configs")
+    print(configs_table)
+    print("Database")
+    print(db_table)
+    print("Others")
+    print(others_table)
+
+
+def add_row_to_table(x, table):
+    '''
+    Checks the content of component x. Adds a row into the given table with the contents
+    '''
+    if DEPLOYMENT_TARGET in x and ARTIFACT_TYPE in x:
+        table.add_row([x[DEPLOYMENT_TARGET], x[ARTIFACT_ID], x[ARTIFACT_TYPE]])
+    elif DEPLOYMENT_TARGET in x and APP_TYPE in x:
+        table.add_row([x[DEPLOYMENT_TARGET], x[APP_NAME], x[APP_TYPE]])
+    elif ARTIFACT_TYPE in x and x[ARTIFACT_TYPE] == 'sql.zip':
+        if DB_TYPE in x:
+            table.add_row(['', x[ARTIFACT_ID], x[ARTIFACT_TYPE], x[DB_TYPE]])
+        else:
+            table.add_row(['', x[ARTIFACT_ID], x[ARTIFACT_TYPE], ''])
+    elif ARTIFACT_TYPE in x and x[ARTIFACT_TYPE] == 'configs.zip':
+        table.add_row(['', x[ARTIFACT_ID], x[ARTIFACT_TYPE]])
+    elif ARTIFACT_TYPE in x:
+        table.add_row(['VMs', x[ARTIFACT_ID], x[ARTIFACT_TYPE]])
+    else:
+        table.add_row(['', x[APP_NAME], x[APP_TYPE]])
 
 
 def main(argv):
